@@ -1,0 +1,16 @@
+amazon-orders==3.2.16
+amazoncaptcha==0.5.11
+beautifulsoup4==4.13.3
+certifi==2025.1.31
+charset-normalizer==3.4.1
+click==8.1.8
+idna==3.10
+Pillow==9.5.0
+python-dateutil==2.9.0.post0
+python-dotenv==1.1.0
+PyYAML==6.0.2
+requests==2.30.0
+six==1.17.0
+soupsieve==2.6
+typing_extensions==4.13.2
+urllib3==2.4.0
