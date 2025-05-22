@@ -1,0 +1,5 @@
+.env
+archives/
+src/ynab_amazon_transactions.json
+src/amazon_orders.json
+src/logs/*
