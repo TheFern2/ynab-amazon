@@ -295,6 +295,12 @@ def main():
             logger.info(f"Skipping transaction {txn['id']} - already has {len(txn['subtransactions'])} subtransactions")
             continue
             
+        # Skip transactions that already have Amazon order links in memo (already processed)
+        memo = txn.get('memo', '') or ''
+        if 'amazon.com/gp/your-account/order-details' in memo:
+            logger.info(f"Skipping transaction {txn['id']} - already has Amazon order link in memo")
+            continue
+            
         matching_order = find_matching_amazon_order(amazon_orders, txn['amount'])
         
         if matching_order:
