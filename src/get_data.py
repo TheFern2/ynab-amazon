@@ -12,6 +12,7 @@ from datetime import timedelta
 parser = argparse.ArgumentParser(description='Fetch Amazon orders and YNAB transactions')
 parser.add_argument('--amazon-year', type=int, default=datetime.now().year, help='Year to fetch Amazon orders for')
 parser.add_argument('--ynab-date', type=str, default=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'), help='Date for YNAB transactions in ISO format (YYYY-MM-DD)')
+parser.add_argument('--payee-name', type=str, default='Amazon', help='Payee name to filter YNAB transactions (default: Amazon)')
 args = parser.parse_args()
 
 # Load environment variables from .env file
@@ -34,6 +35,7 @@ amazon_session = AmazonSession(env_values.get("AMAZON_EMAIL"),
 
 amazon_session.login()
 
+print(f"Fetching Amazon orders for year {args.amazon_year}...")
 amazon_orders = AmazonOrders(amazon_session)
 orders = amazon_orders.get_order_history(year=args.amazon_year, full_details=True)
 
@@ -84,6 +86,7 @@ ynab_client = YNAB(env_values.get("YNAB_API_KEY"))
 # Get today's date in ISO format
 ynab_date = args.ynab_date
 
+print(f"Fetching YNAB transactions from {ynab_date}...")
 # Get transactions using budget ID from .env
 transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"))
 
@@ -91,7 +94,7 @@ transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"))
 amazon_transactions = []
 if 'data' in transactions and 'transactions' in transactions['data']:
     for transaction in transactions['data']['transactions']:
-        if transaction.get('payee_name') == 'Amazon':
+        if transaction.get('payee_name') == args.payee_name:
             amazon_transactions.append(transaction)
             print(f"Date: {transaction['date']}, Amount: ${abs(transaction['amount'])/1000:.2f}, Payee: {transaction['payee_name']}")
 

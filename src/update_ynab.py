@@ -162,7 +162,7 @@ def handle_transaction_mismatch(update, matching_order, difference):
     print(f"Current difference: ${abs(difference)/1000:.2f}")
     print("\nOptions:")
     print("1. Add missing item")
-    print("2. Add gift card amount")
+    print("2. Enter adjustment amount")
     print("3. Skip this transaction")
     
     choice = input("\nEnter your choice (1-3): ")
@@ -191,17 +191,40 @@ def handle_transaction_mismatch(update, matching_order, difference):
         return True
         
     elif choice == "2":
-        gift_card_amount = float(input("Enter gift card amount (positive number): "))
+        print("\nExamples of adjustments:")
+        print("  -1.50  (for a gift card credit - shows negative in Amazon)")
+        print("  +1.20  (for additional charges like tips)")
+        print("  -5.00  (for a refund or discount - shows negative in Amazon)")
+        print("  +2.75  (for additional tax or fees)")
         
-        # For gift cards, we always want to add it as a positive amount (credit)
-        # because it reduces the total amount charged to the credit card
-        amount = int(round(gift_card_amount * 1000))  # Always positive to reduce total
+        adjustment_input = input("\nEnter adjustment amount (- for credits/refunds, + for additional charges): ").strip()
         
-        # Add gift card subtransaction
+        # Parse the adjustment amount
+        try:
+            if adjustment_input.startswith('+'):
+                adjustment_amount = float(adjustment_input[1:])
+            elif adjustment_input.startswith('-'):
+                adjustment_amount = -float(adjustment_input[1:])
+            else:
+                adjustment_amount = float(adjustment_input)
+        except ValueError:
+            print("Invalid amount format. Please try again.")
+            return False
+        
+        memo = input("Enter description for this adjustment: ").strip()
+        if not memo:
+            memo = "Manual Adjustment"
+        
+        # Convert to milliunits (YNAB uses milliunits)
+        # For YNAB: negative amounts are expenses, positive adjustments reduce the total
+        # So Amazon credits (negative) should become positive YNAB adjustments
+        amount = int(round(adjustment_amount * -1000))
+        
+        # Add adjustment subtransaction
         update['subtransactions'].append({
             "amount": amount,
             "payee_name": "Amazon",
-            "memo": "Gift Card Applied"
+            "memo": memo
         })
         
         return True
@@ -267,6 +290,11 @@ def main():
     
     # Process each YNAB transaction
     for txn in ynab_transactions:
+        # Skip transactions that already have subtransactions (already processed)
+        if txn.get('subtransactions') and len(txn['subtransactions']) > 0:
+            logger.info(f"Skipping transaction {txn['id']} - already has {len(txn['subtransactions'])} subtransactions")
+            continue
+            
         matching_order = find_matching_amazon_order(amazon_orders, txn['amount'])
         
         if matching_order:
@@ -342,10 +370,10 @@ def main():
             payload = {'transactions': updates_preview}
             budget_id = env_values.get("YNAB_BUDGET_ID")
             logger.info(f"Using YNAB Budget ID: {budget_id}")
-            response = ynab_client.patch_transactions(budget_id, payload)
+            status_code, response = ynab_client.patch_transactions(budget_id, payload)
             
             # Check if the update was successful
-            if response.get('data') and response.get('status', 0) == 200:
+            if status_code == 200 and response.get('data'):
                 logger.info("Updates completed successfully!")
                 
                 # Show items with no price for manual review
@@ -357,7 +385,7 @@ def main():
                             quantity = item.get('quantity', 1)
                             logger.info(f"- {item['title'][:80]}... (Qty: {quantity})")
             else:
-                logger.error(f"Failed to update transactions. Status: {response.get('status', 'unknown')}")
+                logger.error(f"Failed to update transactions. Status: {status_code}")
                 logger.error(f"Response: {response}")
         except Exception as e:
             logger.error(f"Error updating transactions: {str(e)}")

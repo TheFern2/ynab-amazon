@@ -31,4 +31,4 @@ class YNAB:
         """Update transactions for a specific budget"""
         url = f"{self.BASE_URL}/budgets/{budget_id}/transactions"
         response = requests.patch(url, headers=self.headers, data=json.dumps(payload))
-        return response.json()
+        return response.status_code, response.json()

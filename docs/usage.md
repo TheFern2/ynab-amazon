@@ -35,6 +35,12 @@ If you'd like to get more or other years:
 python get_data.py --amazon-year 2024 --ynab-date 2024-04-10
 ```
 
+You can also specify a different payee name to filter YNAB transactions (defaults to "Amazon"):
+```bash
+python get_data.py --payee-name "Target"
+python get_data.py --amazon-year 2024 --ynab-date 2024-04-10 --payee-name "Walmart"
+```
+
 This script will:
 1. Log into your Amazon account using credentials from your `.env` file (Make sure to add OTP if you have MFA enabled)
 2. Fetch your Amazon order history
@@ -63,8 +69,26 @@ This script will:
 
 If there are discrepancies between the YNAB transaction amounts and the Amazon order totals, the script will prompt you to:
 1. Add missing items
-2. Add gift card amounts
+2. Add adjustments (gift cards, tips, refunds, etc.)
 3. Skip the transaction
+
+#### Option 1: Add Missing Items
+Use this when you have items that weren't captured in the Amazon order data but were part of the transaction.
+
+#### Option 2: Add Adjustments
+This flexible option allows you to add various types of adjustments to match the transaction total. The script will show examples before prompting for input:
+
+**Examples of adjustments:**
+- `-1.50` for a gift card credit (shows negative in Amazon)
+- `+1.20` for additional charges like tips
+- `-5.00` for a refund or discount (shows negative in Amazon)
+- `+2.75` for additional tax or fees
+
+When you select option 2, you'll be prompted to:
+1. Enter the adjustment amount (use `-` for credits/refunds that show negative in Amazon, `+` for additional charges)
+2. Enter a custom description for the adjustment (e.g., "Gift Card Applied", "Delivery Tip", "Refund", etc.)
+
+If you don't provide a description, it will default to "Manual Adjustment".
 
 This interactive process helps ensure that the subtransactions correctly match the total transaction amount.
 
