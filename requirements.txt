@@ -1,4 +1,4 @@
-amazon-orders==3.2.16
+amazon-orders==4.0.9
 amazoncaptcha==0.5.11
 beautifulsoup4==4.13.3
 certifi==2025.1.31
@@ -6,6 +6,7 @@ charset-normalizer==3.4.1
 click==8.1.8
 idna==3.10
 Pillow==9.5.0
+pyotp==2.9.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
 PyYAML==6.0.2
