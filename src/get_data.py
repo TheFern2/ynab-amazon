@@ -89,12 +89,15 @@ with open('amazon_orders.json', 'w') as f:
 # Initialize YNAB client with API key from .env
 ynab_client = YNAB(env_values.get("YNAB_API_KEY"))
 
-# Get today's date in ISO format
-ynab_date = args.ynab_date
+# Use provided date or fallback to today
+if args.ynab_date:
+    ynab_date = datetime.strptime(args.ynab_date, '%Y-%m-%d').date()
+else:
+    ynab_date = datetime.today().date()
 
 print(f"Fetching YNAB transactions from {ynab_date}...")
 # Get transactions using budget ID from .env
-transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"))
+transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"), ynab_date)
 
 # Filter and store Amazon transactions
 amazon_transactions = []
