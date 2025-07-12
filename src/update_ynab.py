@@ -373,12 +373,37 @@ def main():
             }
             
             # Create memo based on number of items
-            base_memo = txn.get('memo', '') or ''
-            if len(matching_order['items']) == 1:
-                item_title = matching_order['items'][0]['title'][:40]
-                update['memo'] = f"{base_memo} {item_title} - {matching_order['order_details_link']}"
-            else:
-                update['memo'] = f"{base_memo} {matching_order['order_details_link']}"
+            order_id = matching_order['order_details_link'].split('orderID=')[-1]
+            item_titles = [item['title'].strip() for item in matching_order['items']]
+
+            max_len = 500
+            memo_prefix = order_id + ", "
+            available_space = max_len - len(memo_prefix)
+
+            memo_items = []
+            used_chars = 0
+            for title in item_titles:
+                # Include separator if not the first title
+                separator = ", " if memo_items else ""
+                next_piece = separator + title
+
+                # Reserve space for potential "(+X more)"
+                remaining_items = len(item_titles) - len(memo_items) - 1
+                reserve = len(f" (+{remaining_items} more)") if remaining_items > 0 else 0
+
+                if used_chars + len(next_piece) + reserve > available_space:
+                    break
+
+                memo_items.append(title)
+                used_chars += len(next_piece)
+
+            # Finalize memo
+            extras = len(item_titles) - len(memo_items)
+            memo = memo_prefix + ", ".join(memo_items)
+            if extras > 0:
+                memo += f" (+{extras} more)"
+
+            update['memo'] = memo
             
             # Store matching order for verification
             matching_orders_map[update['id']] = matching_order
