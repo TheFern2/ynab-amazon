@@ -71,6 +71,12 @@ for order in orders:
         "shipping_total": order.shipping_total,
         "free_shipping": order.free_shipping,
         "refund_total": order.refund_total,
+        "reward_points": order.reward_points,
+        "promotion_applied": order.promotion_applied,
+        "multibuy_discount": order.multibuy_discount,
+        "amazon_discount": order.amazon_discount,
+        "gift_card": order.gift_card,
+        "gift_wrap": order.gift_wrap,        
         "items": items_data
     })
 

@@ -55,7 +55,8 @@ def find_matching_amazon_order(amazon_orders, ynab_amount):
     
     return matching_orders[0] if matching_orders else None
 
-def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amount=None, coupon_savings=None, subscription_discount=None, shipping_total=None, free_shipping=None):
+def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amount=None, coupon_savings=None, subscription_discount=None, shipping_total=None,
+                           free_shipping=None, reward_points=None, promotion_applied=None, multibuy_discount=None, amazon_discount=None, gift_card=None, gift_wrap=None):
     subtransactions = []
     items_with_no_price = []
     subtotal = 0
@@ -146,6 +147,67 @@ def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amo
             "memo": "Sales Tax"
         })
     
+    # Add gift wrap as a separate subtransaction if it exists
+    if gift_wrap and estimated_tax != 'None':
+        gift_wrap = int(round(float(gift_wrap) * -1000))  # Round before converting to int
+        subtotal += gift_wrap
+        subtransactions.append({
+            "amount": gift_wrap,
+            "payee_name": "Amazon",
+            "memo": "Gift Wrap"
+        })
+
+    # Add reward points if present (as negative amount)
+    if reward_points and reward_points != 'None' and float(reward_points) != 0:
+        reward_amount = int(round(float(reward_points) * -1000))  # Negative amount to represent discount
+        subtotal += reward_amount
+        subtransactions.append({
+            "amount": reward_amount,
+            "payee_name": "Amazon",
+            "memo": "Reward Points Used"
+        })
+
+    # Add promotion discount if present (as negative amount)
+    if promotion_applied and promotion_applied != 'None' and float(promotion_applied) != 0:
+        promo_amount = int(round(float(promotion_applied) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Promotion Applied"
+        })
+
+
+    # Add multibuy discount if present (as negative amount)
+    if multibuy_discount and multibuy_discount != 'None' and float(multibuy_discount) != 0:
+        promo_amount = int(round(float(multibuy_discount) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Multibuy Discount"
+        })
+
+    # Add amazon discount if present (as negative amount)
+    if amazon_discount and amazon_discount != 'None' and float(amazon_discount) != 0:
+        promo_amount = int(round(float(amazon_discount) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Amazon Discount"
+        })
+
+    # Add gift card if present (as negative amount)
+    if gift_card and gift_card != 'None' and float(gift_card) != 0:
+        promo_amount = int(round(float(gift_card) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Gift Card"
+        })
+
     # If we have the YNAB amount, adjust the subtransactions to match it exactly
     if ynab_amount and subtransactions:
         difference = ynab_amount - subtotal
@@ -330,7 +392,13 @@ def main():
                 matching_order.get('coupon_savings'),
                 matching_order.get('subscription_discount'),
                 matching_order.get('shipping_total'),
-                matching_order.get('free_shipping')
+                matching_order.get('free_shipping'),
+                matching_order.get('reward_points'),
+                matching_order.get('promotion_applied'),
+                matching_order.get('multibuy_discount'),
+                matching_order.get('amazon_discount'),
+                matching_order.get('gift_card'),
+                matching_order.get('gift_wrap')
             )
             if no_price_items:
                 orders_with_no_price_items[matching_order['order_details_link']] = no_price_items
