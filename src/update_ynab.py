@@ -377,8 +377,8 @@ def main():
     logger.info("Starting YNAB Amazon transaction update process")
     
     # Load command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--redistribute-sales-tax', action='store_true', help='Redistribute sales tax across items')
+    parser = argparse.ArgumentParser(description='Update YNAB orders with details from Amazon transactions')
+    parser.add_argument('--preserve-sales-tax-line', action='store_true', help='Keep sales tax a separate item')
     args = parser.parse_args()
 
     # Load data from JSON files
@@ -517,7 +517,7 @@ def main():
             budget_id = env_values.get("YNAB_BUDGET_ID")
             logger.info(f"Using YNAB Budget ID: {budget_id}")
 
-            if args.redistribute_sales_tax:
+            if not args.preserve_sales_tax_line:
                 payload = redistribute_sales_tax(payload)
 
             status_code, response = ynab_client.patch_transactions(budget_id, payload)
