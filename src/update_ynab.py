@@ -44,7 +44,11 @@ def load_json_file(filename):
     with open(filename, 'r') as f:
         return json.load(f)
 
-def find_matching_amazon_order(amazon_orders, ynab_amount):
+def find_matching_amazon_order(amazon_orders, ynab_transaction):
+    
+    ynab_amount = ynab_transaction['amount']
+    ynab_order_date = datetime.strptime(ynab_transaction['date'], "%Y-%m-%d")
+
     # Convert YNAB amount from milliunits to dollars
     ynab_dollars = ynab_amount / -1000  # Changed to handle negative amount properly
     
@@ -54,7 +58,15 @@ def find_matching_amazon_order(amazon_orders, ynab_amount):
         if abs(float(order['grand_total']) - ynab_dollars) < 0.01
     ]
     
-    return matching_orders[0] if matching_orders else None
+    if not matching_orders:
+        return None
+
+    # Return the order with the closest date
+    return min(
+        matching_orders,
+        key=lambda order: abs(
+            datetime.strptime(order['date'], "%Y-%m-%d") - ynab_order_date)
+    )
 
 def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amount=None, coupon_savings=None, subscription_discount=None, shipping_total=None,
                            free_shipping=None, reward_points=None, promotion_applied=None, multibuy_discount=None, amazon_discount=None, gift_card=None, gift_wrap=None):
@@ -398,7 +410,7 @@ def main():
             logger.info(f"Skipping transaction {txn['id']} - already has Amazon order link in memo")
             continue
             
-        matching_order = find_matching_amazon_order(amazon_orders, txn['amount'])
+        matching_order = find_matching_amazon_order(amazon_orders, txn)
         
         if matching_order:
             update = {
