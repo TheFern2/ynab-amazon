@@ -103,7 +103,7 @@ transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"), yn
 amazon_transactions = []
 if 'data' in transactions and 'transactions' in transactions['data']:
     for transaction in transactions['data']['transactions']:
-        if transaction.get('payee_name') == args.payee_name:
+        if transaction.get('payee_name', '').lower().startswith(args.payee_name.lower()):
             amazon_transactions.append(transaction)
             print(f"Date: {transaction['date']}, Amount: ${abs(transaction['amount'])/1000:.2f}, Payee: {transaction['payee_name']}")
 
