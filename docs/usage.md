@@ -62,8 +62,14 @@ This script will:
 1. Load the previously saved JSON files
 2. Match YNAB transactions with Amazon orders based on the total amount
 3. Create detailed subtransactions for each item in the matched Amazon orders
-4. Preview the updates before applying them
-5. After your confirmation, update the transactions in YNAB
+4. Redistribute the "Sales Tax" line item across other items if necessary
+5. Preview the updates before applying them
+6. After your confirmation, update the transactions in YNAB
+
+If you'd like to keep "Sales Tax" as a separate line item:
+```bash
+python update_ynab.py --preserve-sales-tax-line
+```
 
 ### Handling Mismatches
 
