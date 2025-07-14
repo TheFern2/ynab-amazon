@@ -59,17 +59,7 @@ def find_matching_amazon_order(amazon_orders, ynab_transaction):
     ]
     
     if not matching_orders:
-
-        # Check if this matches a refund
-        if (ynab_amount > 0) :
-            matching_orders = [
-                order for order in amazon_orders 
-                if order['refund_total'] is not None and 
-                    abs(float(order['refund_total']) - abs(ynab_dollars)) < 0.01
-            ]
-
-        if not matching_orders:
-            return None
+        return None
 
     # Return the order with the closest date
     return min(
