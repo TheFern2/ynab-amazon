@@ -71,6 +71,12 @@ for order in orders:
         "shipping_total": order.shipping_total,
         "free_shipping": order.free_shipping,
         "refund_total": order.refund_total,
+        "reward_points": order.reward_points,
+        "promotion_applied": order.promotion_applied,
+        "multibuy_discount": order.multibuy_discount,
+        "amazon_discount": order.amazon_discount,
+        "gift_card": order.gift_card,
+        "gift_wrap": order.gift_wrap,        
         "items": items_data
     })
 
@@ -88,13 +94,13 @@ ynab_date = args.ynab_date
 
 print(f"Fetching YNAB transactions from {ynab_date}...")
 # Get transactions using budget ID from .env
-transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"))
+transactions = ynab_client.get_transactions(env_values.get("YNAB_BUDGET_ID"), ynab_date)
 
 # Filter and store Amazon transactions
 amazon_transactions = []
 if 'data' in transactions and 'transactions' in transactions['data']:
     for transaction in transactions['data']['transactions']:
-        if transaction.get('payee_name') == args.payee_name:
+        if transaction.get('payee_name', '').lower() == args.payee_name.lower():
             amazon_transactions.append(transaction)
             print(f"Date: {transaction['date']}, Amount: ${abs(transaction['amount'])/1000:.2f}, Payee: {transaction['payee_name']}")
 

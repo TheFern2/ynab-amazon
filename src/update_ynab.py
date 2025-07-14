@@ -4,6 +4,7 @@ from ynab import YNAB
 from dotenv import load_dotenv, dotenv_values
 import logging
 from datetime import datetime
+import argparse
 
 # Load environment variables from .env file
 env_values = dotenv_values()
@@ -43,7 +44,11 @@ def load_json_file(filename):
     with open(filename, 'r') as f:
         return json.load(f)
 
-def find_matching_amazon_order(amazon_orders, ynab_amount):
+def find_matching_amazon_order(amazon_orders, ynab_transaction):
+    
+    ynab_amount = ynab_transaction['amount']
+    ynab_order_date = datetime.strptime(ynab_transaction['date'], "%Y-%m-%d")
+
     # Convert YNAB amount from milliunits to dollars
     ynab_dollars = ynab_amount / -1000  # Changed to handle negative amount properly
     
@@ -53,9 +58,18 @@ def find_matching_amazon_order(amazon_orders, ynab_amount):
         if abs(float(order['grand_total']) - ynab_dollars) < 0.01
     ]
     
-    return matching_orders[0] if matching_orders else None
+    if not matching_orders:
+        return None
 
-def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amount=None, coupon_savings=None, subscription_discount=None, shipping_total=None, free_shipping=None):
+    # Return the order with the closest date
+    return min(
+        matching_orders,
+        key=lambda order: abs(
+            datetime.strptime(order['date'], "%Y-%m-%d") - ynab_order_date)
+    )
+
+def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amount=None, coupon_savings=None, subscription_discount=None, shipping_total=None,
+                           free_shipping=None, reward_points=None, promotion_applied=None, multibuy_discount=None, amazon_discount=None, gift_card=None, gift_wrap=None):
     subtransactions = []
     items_with_no_price = []
     subtotal = 0
@@ -146,6 +160,67 @@ def create_subtransactions(items, estimated_tax=None, order_total=None, ynab_amo
             "memo": "Sales Tax"
         })
     
+    # Add gift wrap as a separate subtransaction if it exists
+    if gift_wrap and estimated_tax != 'None':
+        gift_wrap = int(round(float(gift_wrap) * -1000))  # Round before converting to int
+        subtotal += gift_wrap
+        subtransactions.append({
+            "amount": gift_wrap,
+            "payee_name": "Amazon",
+            "memo": "Gift Wrap"
+        })
+
+    # Add reward points if present (as negative amount)
+    if reward_points and reward_points != 'None' and float(reward_points) != 0:
+        reward_amount = int(round(float(reward_points) * -1000))  # Negative amount to represent discount
+        subtotal += reward_amount
+        subtransactions.append({
+            "amount": reward_amount,
+            "payee_name": "Amazon",
+            "memo": "Reward Points Used"
+        })
+
+    # Add promotion discount if present (as negative amount)
+    if promotion_applied and promotion_applied != 'None' and float(promotion_applied) != 0:
+        promo_amount = int(round(float(promotion_applied) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Promotion Applied"
+        })
+
+
+    # Add multibuy discount if present (as negative amount)
+    if multibuy_discount and multibuy_discount != 'None' and float(multibuy_discount) != 0:
+        promo_amount = int(round(float(multibuy_discount) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Multibuy Discount"
+        })
+
+    # Add amazon discount if present (as negative amount)
+    if amazon_discount and amazon_discount != 'None' and float(amazon_discount) != 0:
+        promo_amount = int(round(float(amazon_discount) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Amazon Discount"
+        })
+
+    # Add gift card if present (as negative amount)
+    if gift_card and gift_card != 'None' and float(gift_card) != 0:
+        promo_amount = int(round(float(gift_card) * -1000))  # Negative amount for discount
+        subtotal += promo_amount
+        subtransactions.append({
+            "amount": promo_amount,
+            "payee_name": "Amazon",
+            "memo": "Gift Card"
+        })
+
     # If we have the YNAB amount, adjust the subtransactions to match it exactly
     if ynab_amount and subtransactions:
         difference = ynab_amount - subtotal
@@ -266,12 +341,46 @@ def verify_transaction_amounts(updates_preview, matching_orders_map, logger):
             
     return has_mismatches, fixed_transactions
 
+# Redistribute sales tax evenly across subtransactions, removing the original Sales Tax line
+def redistribute_sales_tax(payload):
+    for transaction in payload.get("transactions", []):
+        subtxns = transaction.get("subtransactions", [])
+
+        # Find the sales tax subtransaction
+        sales_tax_txn = next((st for st in subtxns if st.get("memo") == "Sales Tax"), None)
+        
+        if not sales_tax_txn:
+            continue  # No sales tax to redistribute
+        
+        tax_amount = sales_tax_txn["amount"]
+        subtxns.remove(sales_tax_txn)
+
+        num_items = len(subtxns)
+        if num_items == 0:
+            continue  # Nothing to distribute to
+
+        even_share = tax_amount // num_items
+        remainder = tax_amount % num_items
+
+        for i, subtxn in enumerate(subtxns):
+            subtxn["amount"] += even_share
+            # Add remainder to the last item to make it match exactly
+            if i == num_items - 1:
+                subtxn["amount"] += remainder
+
+    return payload
+
 def main():
     # Set up logging
     logger = setup_logging()
     
     logger.info("Starting YNAB Amazon transaction update process")
     
+    # Load command line arguments
+    parser = argparse.ArgumentParser(description='Update YNAB orders with details from Amazon transactions')
+    parser.add_argument('--preserve-sales-tax-line', action='store_true', help='Keep sales tax a separate item')
+    args = parser.parse_args()
+
     # Load data from JSON files
     amazon_orders = load_json_file('amazon_orders.json')
     ynab_transactions = load_json_file('ynab_amazon_transactions.json')
@@ -301,7 +410,7 @@ def main():
             logger.info(f"Skipping transaction {txn['id']} - already has Amazon order link in memo")
             continue
             
-        matching_order = find_matching_amazon_order(amazon_orders, txn['amount'])
+        matching_order = find_matching_amazon_order(amazon_orders, txn)
         
         if matching_order:
             update = {
@@ -330,7 +439,13 @@ def main():
                 matching_order.get('coupon_savings'),
                 matching_order.get('subscription_discount'),
                 matching_order.get('shipping_total'),
-                matching_order.get('free_shipping')
+                matching_order.get('free_shipping'),
+                matching_order.get('reward_points'),
+                matching_order.get('promotion_applied'),
+                matching_order.get('multibuy_discount'),
+                matching_order.get('amazon_discount'),
+                matching_order.get('gift_card'),
+                matching_order.get('gift_wrap')
             )
             if no_price_items:
                 orders_with_no_price_items[matching_order['order_details_link']] = no_price_items
@@ -376,6 +491,10 @@ def main():
             payload = {'transactions': updates_preview}
             budget_id = env_values.get("YNAB_BUDGET_ID")
             logger.info(f"Using YNAB Budget ID: {budget_id}")
+
+            if not args.preserve_sales_tax_line:
+                payload = redistribute_sales_tax(payload)
+
             status_code, response = ynab_client.patch_transactions(budget_id, payload)
             
             # Check if the update was successful
