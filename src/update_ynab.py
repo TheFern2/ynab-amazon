@@ -3,7 +3,7 @@ import os
 from ynab import YNAB
 from dotenv import load_dotenv, dotenv_values
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import argparse
 
 # Load environment variables from .env file
@@ -44,6 +44,31 @@ def load_json_file(filename):
     with open(filename, 'r') as f:
         return json.load(f)
 
+def load_data_file():
+    """Load the data.json file containing last run information."""
+    data_file = 'data.json'
+    if os.path.exists(data_file):
+        try:
+            with open(data_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
+    return {}
+
+def save_data_file(data):
+    """Save data to the data.json file."""
+    with open('data.json', 'w') as f:
+        json.dump(data, f, indent=2)
+
+def filter_transactions_by_date(transactions, from_date):
+    """Filter transactions to only include those from the specified date forward."""
+    filtered = []
+    for txn in transactions:
+        txn_date = datetime.strptime(txn['date'], "%Y-%m-%d")
+        if txn_date >= from_date:
+            filtered.append(txn)
+    return filtered
+
 def find_matching_amazon_order(amazon_orders, ynab_transaction):
     
     ynab_amount = ynab_transaction['amount']
@@ -55,7 +80,7 @@ def find_matching_amazon_order(amazon_orders, ynab_transaction):
     # Find orders with matching total amount
     matching_orders = [
         order for order in amazon_orders 
-        if abs(float(order['grand_total']) - ynab_dollars) < 0.01
+        if order['grand_total'] is not None and abs(float(order['grand_total']) - ynab_dollars) < 0.01
     ]
     
     if not matching_orders:
@@ -379,13 +404,46 @@ def main():
     # Load command line arguments
     parser = argparse.ArgumentParser(description='Update YNAB orders with details from Amazon transactions')
     parser.add_argument('--preserve-sales-tax-line', action='store_true', help='Keep sales tax a separate item')
+    parser.add_argument('--from-date', type=str, help='Process transactions from this date forward (YYYY-MM-DD format)')
     args = parser.parse_args()
 
     # Load data from JSON files
     amazon_orders = load_json_file('amazon_orders.json')
     ynab_transactions = load_json_file('ynab_amazon_transactions.json')
     
-    logger.info(f"Loaded {len(amazon_orders)} Amazon orders and {len(ynab_transactions)} YNAB transactions")
+    # Load data file and determine date filtering
+    data = load_data_file()
+    from_date = None
+    
+    if args.from_date:
+        # Use the provided from_date
+        try:
+            from_date = datetime.strptime(args.from_date, "%Y-%m-%d")
+            logger.info(f"Using provided from_date: {args.from_date}")
+        except ValueError:
+            logger.error(f"Invalid date format: {args.from_date}. Please use YYYY-MM-DD format.")
+            return
+    else:
+        # Use last_run date if available, otherwise default to 30 days ago
+        if 'last_run' in data:
+            try:
+                last_run = datetime.strptime(data['last_run'], "%Y-%m-%d")
+                from_date = last_run
+                logger.info(f"Using last run date: {data['last_run']}")
+            except ValueError:
+                logger.warning(f"Invalid last_run date in data.json: {data['last_run']}")
+        
+        if from_date is None:
+            # Default to 30 days ago
+            from_date = datetime.now() - timedelta(days=30)
+            logger.info(f"No valid last run date found, defaulting to 30 days ago: {from_date.strftime('%Y-%m-%d')}")
+    
+    # Filter transactions by date
+    original_count = len(ynab_transactions)
+    ynab_transactions = filter_transactions_by_date(ynab_transactions, from_date)
+    
+    logger.info(f"Loaded {len(amazon_orders)} Amazon orders and {original_count} YNAB transactions")
+    logger.info(f"Filtered to {len(ynab_transactions)} transactions from {from_date.strftime('%Y-%m-%d')} forward")
     
     # Initialize YNAB client
     ynab_client = YNAB(env_values.get("YNAB_API_KEY"))
@@ -500,6 +558,12 @@ def main():
             # Check if the update was successful
             if status_code == 200 and response.get('data'):
                 logger.info("Updates completed successfully!")
+                
+                # Update last run date in data.json
+                today = datetime.now().strftime('%Y-%m-%d')
+                data['last_run'] = today
+                save_data_file(data)
+                logger.info(f"Updated last run date to: {today}")
                 
                 # Show items with no price for manual review
                 if orders_with_no_price_items:

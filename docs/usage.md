@@ -60,16 +60,39 @@ python update_ynab.py
 
 This script will:
 1. Load the previously saved JSON files
-2. Match YNAB transactions with Amazon orders based on the total amount
-3. Create detailed subtransactions for each item in the matched Amazon orders
-4. Redistribute the "Sales Tax" line item across other items if necessary
-5. Preview the updates before applying them
-6. After your confirmation, update the transactions in YNAB
+2. **Automatically filter transactions to prevent reprocessing old orders** (uses last run date or defaults to 30 days ago)
+3. Match YNAB transactions with Amazon orders based on the total amount
+4. Create detailed subtransactions for each item in the matched Amazon orders
+5. Redistribute the "Sales Tax" line item across other items if necessary
+6. Preview the updates before applying them
+7. After your confirmation, update the transactions in YNAB
+8. **Save the run date to prevent reprocessing in future runs**
 
-If you'd like to keep "Sales Tax" as a separate line item:
+### Command Line Options
+
+**Keep Sales Tax as separate line item:**
 ```bash
 python update_ynab.py --preserve-sales-tax-line
 ```
+
+**Process transactions from a specific date forward:**
+```bash
+python update_ynab.py --from-date 2025-01-15
+```
+
+**Combine both options:**
+```bash
+python update_ynab.py --preserve-sales-tax-line --from-date 2025-01-01
+```
+
+### Automatic Date Management
+
+The script automatically tracks when it was last run successfully and only processes transactions from that date forward. This prevents reprocessing old transactions that have already been updated.
+
+- **First run**: Processes transactions from the last 30 days
+- **Subsequent runs**: Processes only transactions since the last successful run
+- **Manual override**: Use `--from-date YYYY-MM-DD` to specify a custom start date
+- **Progress tracking**: Creates a `data.json` file to store the last run date
 
 ### Handling Mismatches
 
