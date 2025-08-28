@@ -1,4 +1,4 @@
-amazon-orders==4.0.10
+amazon-orders==4.0.14
 amazoncaptcha==0.5.11
 beautifulsoup4==4.13.3
 certifi==2025.1.31
